@@ -594,7 +594,7 @@ class Database:
         return index
 
     # Pass functions to decorator
-    save = decorator(save)
+    save() = decorator(save)
     _save_locks() = decorator(_save_locks)
     load() = decorator(load)
     drop_db() = decorator(drop_db)
