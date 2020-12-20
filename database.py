@@ -6,6 +6,8 @@ import os
 from btree import Btree
 import shutil
 from misc import split_condition
+import logging
+import warnings
 
 class Database:
     '''
@@ -21,10 +23,10 @@ class Database:
         if load:
             try:
                 self.load(self.savedir)
-                print(f'Loaded "{name}".')
+                logging.info(f'Loaded "{name}".')
                 return
             except:
-                print(f'"{name}" db does not exist, creating new.')
+                warnings.warn(f'Database "{name}" does not exist. Creating new.')
 
         # create dbdata directory if it doesnt exist
         if not os.path.exists('dbdata'):
@@ -43,7 +45,15 @@ class Database:
         self.create_table('meta_indexes',  ['table_name', 'index_name'], [str, str])
         self.save()
 
-
+    def decorator(func):
+        '''
+        Decorator for classifying input operation runtime.
+        '''
+        def wrapper():
+            t0 = time.time()
+            func()
+            logging.info('Elapsed time: '+str('%.2f' % (float(time.time() - t0)*1000))+' ms')
+        return wrapper
 
     def save(self):
         '''
@@ -104,7 +114,7 @@ class Database:
         else:
             raise Exception(f'Attribute "{name}" already exists in class "{self.__class__.__name__}".')
         # self.no_of_tables += 1
-        print(f'New table "{name}"')
+        logging.info(f'Created table "{name}".')
         self._update()
         self.save()
 
@@ -122,7 +132,7 @@ class Database:
         if os.path.isfile(f'{self.savedir}/{table_name}.pkl'):
             os.remove(f'{self.savedir}/{table_name}.pkl')
         else:
-            print(f'"{self.savedir}/{table_name}.pkl" does not exist.')
+            warnings.warn(f'"{self.savedir}/{table_name}.pkl" not found.')
         self.delete('meta_locks', f'table_name=={table_name}')
         self.delete('meta_length', f'table_name=={table_name}')
         self.delete('meta_insert_stack', f'table_name=={table_name}')
@@ -230,11 +240,13 @@ class Database:
             # check the insert_stack meta table
             self.lockX_table(table_name)
         insert_stack = self._get_insert_stack_for_table(table_name)
-        try:
-            self.tables[table_name]._insert(row, insert_stack)
-        except Exception as e:
-            print(e)
-            print('ABORTED')
+        ### NOTE: The exception here is pointless, so it was removed. The user would be alerted of the error regardless. ###
+        #try:
+        self.tables[table_name]._insert(row, insert_stack)
+        #except Exception as e:
+        #    print(e)
+        #    print('ABORTED')
+
         # sleep(2)
         self._update_meta_insert_stack_for_tb(table_name, insert_stack[:-1])
         if lock_load_save:
@@ -374,7 +386,7 @@ class Database:
         '''
         self.load(self.savedir)
         if self.is_locked(left_table_name) or self.is_locked(right_table_name):
-            print(f'Table/Tables are currently locked')
+            warnings.warn(f'Table(s) are currently locked.')
             return
 
         res = self.tables[left_table_name]._inner_join(self.tables[right_table_name], condition)
@@ -412,7 +424,7 @@ class Database:
 
     def is_locked(self, table_name):
         '''
-        Check whether the specified table is exclusivelly locked (X)
+        Check whether the specified table is exclusively locked (X)
 
         table_name -> table's name (needs to exist in database)
         '''
@@ -517,20 +529,19 @@ class Database:
         index_name -> name of the created index
         '''
         if self.tables[table_name].pk_idx is None: # if no primary key, no index
-            print('## ERROR - Cant create index. Table has no primary key.')
-            return
+            raise Exception('Cannot create index. Table has no primary key.')
+
         if index_name not in self.tables['meta_indexes'].index_name:
             # currently only btree is supported. This can be changed by adding another if.
             if index_type=='Btree':
-                print('Creating Btree index.')
+                logging.info('Creating Btree index.')
                 # insert a record with the name of the index and the table on which it's created to the meta_indexes table
                 self.tables['meta_indexes']._insert([table_name, index_name])
                 # crate the actual index
                 self._construct_index(table_name, index_name)
                 self.save()
         else:
-            print('## ERROR - Cant create index. Another index with the same name already exists.')
-            return
+            raise Exception('Cannot create index. Another index with the same name already exists.')
 
     def _construct_index(self, table_name, index_name):
         '''
@@ -581,3 +592,45 @@ class Database:
         index = pickle.load(f)
         f.close()
         return index
+
+    # Pass functions to decorator
+    save = decorator(save)
+    _save_locks() = decorator(_save_locks)
+    load() = decorator(load)
+    drop_db() = decorator(drop_db)
+
+    # I/O functions
+    _update() = decorator(_update)
+    create_table() = decorator(create_table)
+    drop_table() = decorator(drop_table)
+    table_from_csv() = decorator(table_from_csv)
+    table_to_csv() = decorator(table_to_csv)
+    table_from_object() = decorator(table_from_object)
+
+    # Table functions
+    cast_column() = decorator(cast_column)
+    insert() = decorator(insert)
+    update() = decorator(update)
+    delete() = decorator(delete)
+    select() = decorator(select)
+    show_table() = decorator(show_table)
+    sort() = decorator(sort)
+    inner_join() = decorator(inner_join)
+    lockX_table() = decorator(lockX_table)
+    unlock_table() = decorator(unlock_table)
+    is_locked() = decorator(is_locked)
+
+    # Meta
+    _update_meta_length() = decorator(_update_meta_length)
+    _update_meta_locks() = decorator(_update_meta_locks)
+    _update_meta_insert_stack() = decorator(_update_meta_insert_stack)
+    _add_to_insert_stack() = decorator(_add_to_insert_stack)
+    _get_insert_stack_for_table() = decorator(_get_insert_stack_for_table)
+    _update_meta_insert_stack_for_tb() = decorator(_update_meta_insert_stack_for_tb)
+
+    # Indexes
+    create_index() = decorator(create_index)
+    _construct_index() = decorator(_construct_index)
+    _has_index() = decorator(_has_index)
+    _save_index() = decorator(_save_index)
+    _load_idx() = decorator(_load_idx)
