@@ -5,6 +5,7 @@ from time import sleep, localtime, strftime
 import os
 from btree import Btree
 import shutil
+import time
 from misc import split_condition
 import logging
 import warnings
@@ -55,6 +56,7 @@ class Database:
             logging.info('Elapsed time: '+str('%.2f' % (float(time.time() - t0)*1000))+' ms')
         return wrapper
 
+    @decorator
     def save(self):
         '''
         Save db as a pkl file. This method saves the db object, ie all the tables and attributes.
@@ -63,6 +65,7 @@ class Database:
             with open(f'{self.savedir}/{name}.pkl', 'wb') as f:
                 pickle.dump(table, f)
 
+    @decorator
     def _save_locks(self):
         '''
         Save db as a pkl file. This method saves the db object, ie all the tables and attributes.
@@ -70,6 +73,7 @@ class Database:
         with open(f'{self.savedir}/meta_locks.pkl', 'wb') as f:
             pickle.dump(self.tables['meta_locks'], f)
 
+    @decorator
     def load(self, path):
         '''
         Load all the tables that are part of the db (indexs are noted loaded here)
@@ -85,11 +89,13 @@ class Database:
             self.tables.update({name: tmp_dict})
             setattr(self, name, self.tables[name])
 
+    @decorator
     def drop_db(self):
         shutil.rmtree(self.savedir)
 
     #### IO ####
 
+    @decorator
     def _update(self):
         '''
         Update all the meta tables.
@@ -98,7 +104,7 @@ class Database:
         self._update_meta_locks()
         self._update_meta_insert_stack()
 
-
+    @decorator
     def create_table(self, name=None, column_names=None, column_types=None, primary_key=None, load=None):
         '''
         This method create a new table. This table is saved and can be accessed by
@@ -118,7 +124,7 @@ class Database:
         self._update()
         self.save()
 
-
+    @decorator
     def drop_table(self, table_name):
         '''
         Drop table with name 'table_name' from current db
@@ -140,7 +146,7 @@ class Database:
         # self._update()
         self.save()
 
-
+    @decorator
     def table_from_csv(self, filename, name=None, column_types=None, primary_key=None):
         '''
         Create a table from a csv file.
@@ -169,7 +175,7 @@ class Database:
         self._update()
         self.save()
 
-
+    @decorator
     def table_to_csv(self, table_name, filename=None):
         res = ''
         for row in [self.tables[table_name].column_names]+self.tables[table_name].data:
@@ -181,6 +187,7 @@ class Database:
         with open(filename, 'w') as file:
            file.write(res)
 
+    @decorator
     def table_from_object(self, new_table):
         '''
         Add table obj to database.
@@ -205,7 +212,7 @@ class Database:
     # tables.
 
     # these function calls are named close to the ones in postgres
-
+    @decorator
     def cast_column(self, table_name, column_name, cast_type):
         '''
         Change the type of the specified column and cast all the prexisting values.
@@ -224,6 +231,7 @@ class Database:
         self._update()
         self.save()
 
+    @decorator
     def insert(self, table_name, row, lock_load_save=True):
         '''
         Inserts into table
@@ -254,7 +262,7 @@ class Database:
             self._update()
             self.save()
 
-
+    @decorator
     def update(self, table_name, set_value, set_column, condition):
         '''
         Update the value of a column where condition is met.
@@ -277,6 +285,7 @@ class Database:
         self._update()
         self.save()
 
+    @decorator
     def delete(self, table_name, condition):
         '''
         Delete rows of a table where condition is met.
@@ -301,6 +310,7 @@ class Database:
             self._add_to_insert_stack(table_name, deleted)
         self.save()
 
+    @decorator
     def select(self, table_name, columns, condition=None, order_by=None, asc=False,\
                top_k=None, save_as=None, return_object=False):
         '''
@@ -342,6 +352,7 @@ class Database:
             else:
                 table.show()
 
+    @decorator
     def show_table(self, table_name, no_of_rows=None):
         '''
         Print a table using a nice tabular design (tabulate)
@@ -353,6 +364,7 @@ class Database:
             return
         self.tables[table_name].show(no_of_rows, self.is_locked(table_name))
 
+    @decorator
     def sort(self, table_name, column_name, asc=False):
         '''
         Sorts a table based on a column
@@ -371,6 +383,7 @@ class Database:
         self._update()
         self.save()
 
+    @decorator
     def inner_join(self, left_table_name, right_table_name, condition, save_as=None, return_object=False):
         '''
         Join two tables that are part of the database where condition is met.
@@ -399,6 +412,7 @@ class Database:
             else:
                 res.show()
 
+    @decorator
     def lockX_table(self, table_name):
         '''
         Locks the specified table using the exclusive lock (X)
@@ -412,6 +426,7 @@ class Database:
         self._save_locks()
         # print(f'Locking table "{table_name}"')
 
+    @decorator
     def unlock_table(self, table_name):
         '''
         Unlocks the specified table that is exclusivelly locked (X)
@@ -422,6 +437,7 @@ class Database:
         self._save_locks()
         # print(f'Unlocking table "{table_name}"')
 
+    @decorator
     def is_locked(self, table_name):
         '''
         Check whether the specified table is exclusively locked (X)
@@ -450,6 +466,7 @@ class Database:
     # Important: Meta tables contain info regarding the NON meta tables ONLY.
     # i.e. meta_length will not show the number of rows in meta_locks etc.
 
+    @decorator
     def _update_meta_length(self):
         '''
         updates the meta_length table.
@@ -466,6 +483,7 @@ class Database:
             self.tables['meta_length']._update_row(non_none_rows, 'no_of_rows', f'table_name=={table._name}')
             # self.update_row('meta_length', len(table.data), 'no_of_rows', 'table_name', '==', table._name)
 
+    @decorator
     def _update_meta_locks(self):
         '''
         updates the meta_locks table
@@ -478,6 +496,7 @@ class Database:
                 self.tables['meta_locks']._insert([table._name, False])
                 # self.insert('meta_locks', [table._name, False])
 
+    @decorator
     def _update_meta_insert_stack(self):
         '''
         updates the meta_insert_stack table
@@ -488,7 +507,7 @@ class Database:
             if table._name not in self.meta_insert_stack.table_name:
                 self.tables['meta_insert_stack']._insert([table._name, []])
 
-
+    @decorator
     def _add_to_insert_stack(self, table_name, indexes):
         '''
         Added the supplied indexes to the insert stack of the specified table
@@ -499,6 +518,7 @@ class Database:
         old_lst = self._get_insert_stack_for_table(table_name)
         self._update_meta_insert_stack_for_tb(table_name, old_lst+indexes)
 
+    @decorator
     def _get_insert_stack_for_table(self, table_name):
         '''
         Return the insert stack of the specified table
@@ -509,6 +529,7 @@ class Database:
         # res = self.select('meta_insert_stack', '*', f'table_name=={table_name}', return_object=True).indexes[0]
         # return res
 
+    @decorator
     def _update_meta_insert_stack_for_tb(self, table_name, new_stack):
         '''
         Replaces the insert stack of a table with the one that will be supplied by the user
@@ -520,6 +541,7 @@ class Database:
 
 
     # indexes
+    @decorator
     def create_index(self, table_name, index_name, index_type='Btree'):
         '''
         Create an index on a specified table with a given name.
@@ -543,6 +565,7 @@ class Database:
         else:
             raise Exception('Cannot create index. Another index with the same name already exists.')
 
+    @decorator
     def _construct_index(self, table_name, index_name):
         '''
         Construct a btree on a table and save.
@@ -558,7 +581,7 @@ class Database:
         # save the btree
         self._save_index(index_name, bt)
 
-
+    @decorator
     def _has_index(self, table_name):
         '''
         Check whether the specified table's primary key column is indexed
@@ -567,6 +590,7 @@ class Database:
         '''
         return table_name in self.tables['meta_indexes'].table_name
 
+    @decorator
     def _save_index(self, index_name, index):
         '''
         Save the index object
@@ -582,6 +606,7 @@ class Database:
         with open(f'{self.savedir}/indexes/meta_{index_name}_index.pkl', 'wb') as f:
             pickle.dump(index, f)
 
+    @decorator
     def _load_idx(self, index_name):
         '''
         load and return the specified index
@@ -592,45 +617,3 @@ class Database:
         index = pickle.load(f)
         f.close()
         return index
-
-    # Pass functions to decorator
-    save() = decorator(save)
-    _save_locks() = decorator(_save_locks)
-    load() = decorator(load)
-    drop_db() = decorator(drop_db)
-
-    # I/O functions
-    _update() = decorator(_update)
-    create_table() = decorator(create_table)
-    drop_table() = decorator(drop_table)
-    table_from_csv() = decorator(table_from_csv)
-    table_to_csv() = decorator(table_to_csv)
-    table_from_object() = decorator(table_from_object)
-
-    # Table functions
-    cast_column() = decorator(cast_column)
-    insert() = decorator(insert)
-    update() = decorator(update)
-    delete() = decorator(delete)
-    select() = decorator(select)
-    show_table() = decorator(show_table)
-    sort() = decorator(sort)
-    inner_join() = decorator(inner_join)
-    lockX_table() = decorator(lockX_table)
-    unlock_table() = decorator(unlock_table)
-    is_locked() = decorator(is_locked)
-
-    # Meta
-    _update_meta_length() = decorator(_update_meta_length)
-    _update_meta_locks() = decorator(_update_meta_locks)
-    _update_meta_insert_stack() = decorator(_update_meta_insert_stack)
-    _add_to_insert_stack() = decorator(_add_to_insert_stack)
-    _get_insert_stack_for_table() = decorator(_get_insert_stack_for_table)
-    _update_meta_insert_stack_for_tb() = decorator(_update_meta_insert_stack_for_tb)
-
-    # Indexes
-    create_index() = decorator(create_index)
-    _construct_index() = decorator(_construct_index)
-    _has_index() = decorator(_has_index)
-    _save_index() = decorator(_save_index)
-    _load_idx() = decorator(_load_idx)
